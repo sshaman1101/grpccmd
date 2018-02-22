@@ -7,8 +7,12 @@ import (
 	"os"
 	"reflect"
 
+	"io/ioutil"
+
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
+	"github.com/sonm-io/core/accounts"
+	"github.com/sonm-io/core/cmd/cli/config"
 	"github.com/sonm-io/core/util"
 	"github.com/sonm-io/core/util/xgrpc"
 	"github.com/spf13/cobra"
@@ -20,18 +24,17 @@ var (
 	rootCmd = &cobra.Command{}
 	remote  = new(string)
 	input   = new(string)
-	ethKey  = new(ecdsa.PrivateKey)
 )
 
 func init() {
-	// todo: read input as file
-	rootCmd.PersistentFlags().StringVar(remote, "remote", "eth@ip", "gRPC server endpoint eth@")
-	rootCmd.PersistentFlags().StringVar(input, "input", "{}", "JSON representation of the input data for the method.")
+	rootCmd.SetOutput(os.Stdout)
+
+	rootCmd.PersistentFlags().StringVar(remote, "remote", "", "gRPC server endpoint")
+	rootCmd.PersistentFlags().StringVar(input, "input", "", "JSON file with request body")
 }
-func SetCmdInfo(name, short string, key *ecdsa.PrivateKey) {
+func SetCmdInfo(name, short string) {
 	rootCmd.Use = fmt.Sprintf("%s [command]", name)
 	rootCmd.Short = short
-	ethKey = key
 }
 
 func RegisterServiceCmd(cmd *cobra.Command) {
@@ -44,7 +47,12 @@ func Execute() error {
 
 func RunE(method, inT string, newClient func(*grpc.ClientConn) interface{}) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		conn, err := dial()
+		key, err := openConfigAndLoadEthKey()
+		if err != nil {
+			return fmt.Errorf("cannot open eth key: %v", err)
+		}
+
+		conn, err := dial(key)
 		if err != nil {
 			return err
 		}
@@ -54,9 +62,19 @@ func RunE(method, inT string, newClient func(*grpc.ClientConn) interface{}) func
 		cv := reflect.ValueOf(c)
 		method := cv.MethodByName(method)
 		if method.IsValid() {
+			var err error
+			var requestBody = []byte("{}")
+			if len(*input) > 0 {
+				// we have file name, so read it
+				requestBody, err = ioutil.ReadFile(*input)
+				if err != nil {
+					return fmt.Errorf("cannot read request body from %s: %v", *input, err)
+				}
+			}
+
 			in := reflect.New(proto.MessageType(inT).Elem()).Interface()
 			if len(*input) > 0 {
-				if err := json.Unmarshal([]byte(*input), in); err != nil {
+				if err := json.Unmarshal(requestBody, in); err != nil {
 					return err
 				}
 			}
@@ -75,12 +93,12 @@ func RunE(method, inT string, newClient func(*grpc.ClientConn) interface{}) func
 			}
 
 			out := result[0].Interface()
-			data, err := json.MarshalIndent(out, "", "  ")
+			responseBody, err := json.MarshalIndent(out, "", "  ")
 			if err != nil {
 				return err
 			}
 
-			cmd.Println(string(data))
+			cmd.Println(string(responseBody))
 		}
 
 		return nil
@@ -110,14 +128,42 @@ func TypeToJson(inT string) func(cmd *cobra.Command, args []string) error {
 }
 
 // dial build ClientConn wrapper with SONM Wallet auth
-func dial() (*grpc.ClientConn, error) {
+func dial(key *ecdsa.PrivateKey) (*grpc.ClientConn, error) {
+	if *remote == "" {
+		return nil, fmt.Errorf("remote endpoint address is required")
+	}
+
 	ctx := context.Background()
 
-	_, TLSConfig, err := util.NewHitlessCertRotator(ctx, ethKey)
+	_, TLSConfig, err := util.NewHitlessCertRotator(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
 	creds := util.NewTLS(TLSConfig)
 	return xgrpc.NewWalletAuthenticatedClient(ctx, creds, *remote)
+}
+
+func openConfigAndLoadEthKey() (*ecdsa.PrivateKey, error) {
+	cfg, err := config.NewConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ko, err := accounts.DefaultKeyOpener(accounts.NewSilentPrinter(), cfg.KeyStore(), cfg.PassPhrase())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ko.OpenKeystore()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := ko.GetKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
