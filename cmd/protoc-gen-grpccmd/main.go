@@ -7,7 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/generator"
 	_ "github.com/golang/protobuf/protoc-gen-go/grpc"
-	_ "github.com/nathanielc/grpccmd"
+	_ "github.com/sshaman1101/grpccmd"
 )
 
 func main() {
