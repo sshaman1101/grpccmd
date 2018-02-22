@@ -4,10 +4,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"reflect"
-
-	"io/ioutil"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -17,7 +17,6 @@ import (
 	"github.com/sonm-io/core/util/xgrpc"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -45,7 +44,7 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-func RunE(method, inT string, newClient func(*grpc.ClientConn) interface{}) func(*cobra.Command, []string) error {
+func RunE(method, inT string, newClient func(closer io.Closer) interface{}) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		key, err := openConfigAndLoadEthKey()
 		if err != nil {
@@ -128,7 +127,7 @@ func TypeToJson(inT string) func(cmd *cobra.Command, args []string) error {
 }
 
 // dial build ClientConn wrapper with SONM Wallet auth
-func dial(key *ecdsa.PrivateKey) (*grpc.ClientConn, error) {
+func dial(key *ecdsa.PrivateKey) (io.Closer, error) {
 	if *remote == "" {
 		return nil, fmt.Errorf("remote endpoint address is required")
 	}

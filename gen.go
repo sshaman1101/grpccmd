@@ -81,7 +81,7 @@ func (g *grpccmd) Generate(file *generator.FileDescriptor) {
 						"%s",
 						"%s",
 						func(c *grpc.ClientConn) interface{} {
-						return New%sgClient(c)
+						return New%sClient(c)
 					},
 				),`,
 				methodName,
