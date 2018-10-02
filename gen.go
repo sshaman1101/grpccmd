@@ -18,7 +18,7 @@ func init() {
 	generator.RegisterPlugin(new(grpccmd))
 }
 
-// Name returns the name of this plugin, "grpc".
+// Name returns the name of this plugin, "grpccmd".
 func (g *grpccmd) Name() string {
 	return "grpccmd"
 }
@@ -38,7 +38,7 @@ func (g *grpccmd) GenerateImports(file *generator.FileDescriptor) {
 	"io"
 
 	"github.com/spf13/cobra"
-	"github.com/sshaman1101/grpccmd"
+	"github.com/sonm-io/core/util/xcode"
 )`)
 	}
 }
@@ -49,7 +49,7 @@ func (g *grpccmd) Generate(file *generator.FileDescriptor) {
 	}
 
 	g.P("// Begin grpccmd ")
-	g.P("var _ = grpccmd.RunE")
+	g.P("var _ = xcode.RunE")
 
 	for _, s := range file.GetService() {
 		var methodVars []string
@@ -79,7 +79,7 @@ func (g *grpccmd) Generate(file *generator.FileDescriptor) {
 			))
 
 			g.P(fmt.Sprintf(
-				`RunE: grpccmd.RunE(
+				`RunE: xcode.RunE(
 						"%s",
 						"%s",
 						func(c io.Closer) interface{} {
@@ -105,7 +105,7 @@ func (g *grpccmd) Generate(file *generator.FileDescriptor) {
 				toTypeName(m.GetInputType()),
 			))
 
-			g.P(fmt.Sprintf(`RunE: grpccmd.TypeToJson("%s"),`, toTypeName(m.GetInputType())))
+			g.P(fmt.Sprintf(`RunE: xcode.TypeToJson("%s"),`, toTypeName(m.GetInputType())))
 			g.P("}")
 			g.P()
 
@@ -113,7 +113,7 @@ func (g *grpccmd) Generate(file *generator.FileDescriptor) {
 
 		g.P("// Register commands with the root command and service command")
 		g.P("func init() {")
-		g.P("grpccmd.RegisterServiceCmd(", serviceCmdVar, ")")
+		g.P("xcode.RegisterServiceCmd(", serviceCmdVar, ")")
 		g.P(serviceCmdVar, ".AddCommand(")
 		for _, n := range methodVars {
 			g.P(n, ",")

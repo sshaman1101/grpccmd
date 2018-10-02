@@ -4,7 +4,7 @@ all: build install
 
 build:
 	@echo "+ $@"
-	go build -o ${OUT} cmd/protoc-gen-grpccmd/main.go
+	go build -tags 'nocgo' -o ${OUT} cmd/protoc-gen-grpccmd/main.go
 
 install:
 	@echo "+ $@"
