@@ -37,8 +37,8 @@ func (g *grpccmd) GenerateImports(file *generator.FileDescriptor) {
 		g.P(`import (
 	"io"
 
-	"github.com/spf13/cobra"
 	"github.com/sonm-io/core/util/xcode"
+	"github.com/spf13/cobra"
 )`)
 	}
 }
